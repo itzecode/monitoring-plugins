@@ -16,6 +16,7 @@ use strict;
 no warnings;
 use Net::SNMP;
 use Getopt::Long;
+use Number::Format qw(:subs);
 
 # Variables {{{
 
@@ -307,7 +308,7 @@ else {
   print "OK: ";
   $exit_val=$ERRORS{"OK"};
 }
-print "$ifsValue[1] of $ifsValue[0] bytes used";
+print format_bytes($ifsValue[1]) ." of ". format_bytes($ifsValue[0]) ." used";
 if (defined($withPerfData)) {
   print " | ifsAvailable=$ifsValue[0] ifsFree=$ifsValue[1];$warning;$critical\n";
 } else {
