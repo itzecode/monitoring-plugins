@@ -193,9 +193,9 @@ sub checkOptions {
   # Get rid of % sign if someone placed it
   $warning  =~ s/\%//g; 
   $critical =~ s/\%//g;
-  # Check that warn > crit
-  if( $warning > $critical ) {
-    print "warning <= critical!\n";
+  # Check that warn < crit
+  if( $warning < $critical ) {
+    print "warning > critical!\n";
     showUsage();
     exit $ERRORS{"UNKNOWN"};
   }
@@ -272,11 +272,17 @@ if (!defined($session)) {
 my $exit_val=undef;
 
 # }}}
+# number formatting
+
+my $de = new Number::Format(-thousands_sep   => '.',
+                            -decimal_point   => ',',
+                            -giga_suffix     => ' GB');
+
 # Get Values from DELL EMC Isilon OneFS via SNMP {{{
 
 beVerbose("getting values");
 
-my @oidlists = ($ifsAvailableBytes, $ifsFreeBytes);
+my @oidlists = ($ifsAvailableBytes, $ifsFreeBytes, $ifsUsedBytes, $ifsTotalBytes);
 my $resultat = (Net::SNMP->VERSION < 2) ? $session->get_request(@oidlists) : $session->get_request(-varbindlist => \@oidlists);
 if (!defined($resultat)) {
   printf("ERROR: Description table: %s.\n", $session->error);
@@ -291,16 +297,25 @@ if (!defined ($$resultat{$ifsFreeBytes})) {
 my @ifsValue = undef;
 $ifsValue[0]=$$resultat{$ifsAvailableBytes};
 $ifsValue[1]=$$resultat{$ifsFreeBytes};
+$ifsValue[2]=$$resultat{$ifsUsedBytes};
+$ifsValue[3]=$$resultat{$ifsTotalBytes};
+
+beVerbose("available bytes: $ifsValue[0]");
+beVerbose("free bytes: $ifsValue[1]");
+beVerbose("used bytes: $ifsValue[2]");
+beVerbose("total bytes: $ifsValue[3]");
+
+my $usedSpace = $de->format_bytes( $ifsValue[0] );
 
 print "OneFS ";
 
 $exit_val=$ERRORS{"OK"};
 
-if( $ifsValue[1] > $warning ) {
+if( $ifsValue[0] < $warning ) {
   print "WARNING: ";
   $exit_val=$ERRORS{"WARNING"};
 }
-elsif( $ifsValue[2] > $critical ) {
+elsif( $ifsValue[0] < $critical ) {
   print "CRITICAL: ";
   $exit_val=$ERRORS{"CRITICAL"};
 }
@@ -308,9 +323,9 @@ else {
   print "OK: ";
   $exit_val=$ERRORS{"OK"};
 }
-print format_bytes($ifsValue[1]) ." of ". format_bytes($ifsValue[0]) ." used";
+print $usedSpace . " left";
 if (defined($withPerfData)) {
-  print " | ifsAvailable=$ifsValue[0] ifsFree=$ifsValue[1];$warning;$critical\n";
+  print " | ifsAvailable=$ifsValue[0];$warning;$critical\n";
 } else {
   print "\n";
 }
